@@ -34,9 +34,9 @@ public class MainActivity extends AppCompatActivity {
     public static final int REQUEST_IMAGE_PICK = 1;
     public static final int REQUEST_IMAGE_CROP = 2;
 
-    private File imageFile;
-    private File cropImageFile;
-    private String cropImagePath;
+    private File imageFile;         // 拍照产生的图片
+    private File cropImageFile;     // 剪切后的图片
+    private String cropImagePath;   // 剪切后的图片的路径
 
     private ImageView imageView;
     private RadioGroup weatherChooseRadioGroup;
@@ -56,22 +56,22 @@ public class MainActivity extends AppCompatActivity {
         db = Room.databaseBuilder(getApplicationContext(), AppDatabase.class, "db_smokedetect").allowMainThreadQueries().build();
     }
 
-    // 创建图片文件，拍照产生的图片 && 剪切后的图片
+    // 在应用专属目录创建图片文件，包括拍照产生的图片和剪切后的图片
     private File createImageFile(boolean isCrop) {
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
         String imageFileName;
         if (isCrop) {
-            imageFileName = "CROP_" + timeStamp + "_";
+            imageFileName = "CROP_" + timeStamp;
         } else {
-            imageFileName = "JPEG_" + timeStamp + "_";
+            imageFileName = "JPEG_" + timeStamp;
         }
         File storageDir = getExternalFilesDir(Environment.DIRECTORY_PICTURES);
         File f;
         try {
             f = File.createTempFile(
-                    imageFileName,  /* prefix */
-                    ".jpg",         /* suffix */
-                    storageDir      /* directory */
+                    imageFileName,
+                    ".jpg",
+                    storageDir
             );
             if (isCrop) {
                 cropImagePath = f.getPath();
@@ -83,30 +83,30 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // 拍照生成图片
+    // onClickListener 拍照生成图片
     public void takeImageFromCamera(View view) {
         Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         imageFile = createImageFile(false);
         if (imageFile != null) {
             Uri imageUri;
-            if(Build.VERSION.SDK_INT>=24){
-                imageUri = FileProvider.getUriForFile(MainActivity.this,"com.example.smokedetect.fileprovider", imageFile);
-            }else{
-                imageUri =Uri.fromFile(imageFile);
+            if (Build.VERSION.SDK_INT >= 24) {
+                imageUri = FileProvider.getUriForFile(MainActivity.this, "com.example.smokedetect.fileprovider", imageFile);
+            } else {
+                imageUri = Uri.fromFile(imageFile);
             }
             intent.putExtra("outputFormat", Bitmap.CompressFormat.JPEG.toString());
             intent.putExtra(MediaStore.EXTRA_OUTPUT, imageUri);
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
 
-            startActivityForResult(intent, REQUEST_IMAGE_CAPTURE);
+            startActivityForResult(intent, REQUEST_IMAGE_CAPTURE);  // 调用系统相机
         }
     }
 
-    // 相册选择图片
+    // onClickListener 相册选择图片
     public void pickImageFromLocal(View view) {
         Intent intent = new Intent(Intent.ACTION_PICK, null);
         intent.setDataAndType(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, "image/*");
-        startActivityForResult(intent, REQUEST_IMAGE_PICK);
+        startActivityForResult(intent, REQUEST_IMAGE_PICK);   // 调用系统相册选择图片
     }
 
     // 图片剪切
@@ -127,7 +127,7 @@ public class MainActivity extends AppCompatActivity {
                     .putExtra(MediaStore.EXTRA_OUTPUT, imageCropUri)
                     .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     .addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
-            startActivityForResult(intent, REQUEST_IMAGE_CROP);
+            startActivityForResult(intent, REQUEST_IMAGE_CROP);   // 调用系统剪切
         }
     }
 
@@ -136,7 +136,7 @@ public class MainActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
 
         if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK) {
-            Uri imageUri = FileProvider.getUriForFile(MainActivity.this,"com.example.smokedetect.fileprovider", imageFile);
+            Uri imageUri = FileProvider.getUriForFile(MainActivity.this, "com.example.smokedetect.fileprovider", imageFile);
             getImageCrop(imageUri);
             return;
         }
@@ -153,9 +153,9 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // 触发图像处理
+    // onClickListener 确认检测，触发图像处理
     public void confirmToProcess(View view) {
-        // Toast 开始处理
+        // 确认天气级别
         int weatherLevel = 0;
         int selectID = weatherChooseRadioGroup.getCheckedRadioButtonId();
         switch (selectID) {
@@ -169,12 +169,15 @@ public class MainActivity extends AppCompatActivity {
                 weatherLevel = 2;
                 break;
         }
+
+        // 得到林格曼黑度
         int result = getImageResult(weatherLevel);
 
         // 保存路径和结果到数据库
         DetectRecord r = new DetectRecord(cropImagePath, result);
         db.detectRecordDao().insert(r);
 
+        // 跳转到结果页
         Intent intent = new Intent(this, ResultActivity.class);
         intent.putExtra(EXTRA_RESULT_NUMBER, result);
         intent.putExtra(EXTRA_CROP_IMAGE_PATH, cropImagePath);
@@ -197,10 +200,10 @@ public class MainActivity extends AppCompatActivity {
         }
         double sum = 0;
         for (double d : greyScaleList) {
-            sum += d;
+            sum += d / 255;
         }
         double average = sum / greyScaleList.size();
-        double gray = 1 - average / 255;
+        double black = 1 - average;
 
         double adjustment = 0;
         switch (weatherLevel) {
@@ -216,15 +219,15 @@ public class MainActivity extends AppCompatActivity {
         }
 
         int RingelmannScale;
-        if (gray <= 0.2 + adjustment ) {
+        if (black < 0.1 + adjustment) {
             RingelmannScale = 0;
-        } else if (gray < 0.4 + adjustment ) {
+        } else if (black < 0.3 + adjustment) {
             RingelmannScale = 1;
-        } else if (gray < 0.6 + adjustment ) {
+        } else if (black < 0.5 + adjustment) {
             RingelmannScale = 2;
-        } else if (gray < 0.8 + adjustment ) {
+        } else if (black < 0.7 + adjustment) {
             RingelmannScale = 3;
-        } else if (gray < 1 - adjustment) {
+        } else if (black < 0.9 + adjustment) {
             RingelmannScale = 4;
         } else {
             RingelmannScale = 5;
@@ -232,6 +235,7 @@ public class MainActivity extends AppCompatActivity {
         return RingelmannScale;
     }
 
+    // onClickListener 显示历史检测记录
     public void showRecordList(View view) {
         Intent intent = new Intent(this, RecordListActivity.class);
         startActivity(intent);

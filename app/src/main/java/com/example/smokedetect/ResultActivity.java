@@ -48,6 +48,7 @@ public class ResultActivity extends AppCompatActivity {
         resultImageFile = null;
     }
 
+    // 生成检测结果图（剪切后图片+检测结果）
     private void generateResultImage(boolean inSave) throws IOException {
         // 由view生成bitmap
         View v = findViewById(R.id.result_wrap);
@@ -56,7 +57,7 @@ public class ResultActivity extends AppCompatActivity {
 
         // 保存bitmap到文件
         String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-        String imageFileName = "RESULT_" + timeStamp + "_";
+        String imageFileName = "RESULT_" + timeStamp;
         File storageDir;
         if (inSave) {
             storageDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
@@ -71,26 +72,12 @@ public class ResultActivity extends AppCompatActivity {
         resultImageFile = f;
     }
 
+    // onClickListener 保存到系统相册
     public void saveToAlbum(View view) {
+        // 在运行时申请存储权限
         ActivityCompat.requestPermissions(this,
                 new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
                 REQUEST_PERMISSIONS_EXTERNAL_STORAGE);
-    }
-
-    public void shareToSystem(View view) {
-        try {
-            generateResultImage(false);
-        } catch (IOException e) {
-            e.printStackTrace();
-            Toast.makeText(this, "结果图生成失败！", Toast.LENGTH_LONG).show();
-            return;
-        }
-        Uri imageUri = FileProvider.getUriForFile(this, "com.example.smokedetect.fileprovider", resultImageFile);
-        Intent intent = new Intent(Intent.ACTION_SEND);
-        intent.putExtra(Intent.EXTRA_STREAM, imageUri);
-        intent.setType("image/png");
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        startActivity(Intent.createChooser(intent, "分享到"));
     }
 
     @Override
@@ -112,5 +99,22 @@ public class ResultActivity extends AppCompatActivity {
                 Toast.makeText(this, "成功保存至相册！", Toast.LENGTH_LONG).show();
             }
         }
+    }
+
+    // onClickListener 调用系统分享
+    public void shareToSystem(View view) {
+        try {
+            generateResultImage(false);
+        } catch (IOException e) {
+            e.printStackTrace();
+            Toast.makeText(this, "结果图生成失败！", Toast.LENGTH_LONG).show();
+            return;
+        }
+        Uri imageUri = FileProvider.getUriForFile(this, "com.example.smokedetect.fileprovider", resultImageFile);
+        Intent intent = new Intent(Intent.ACTION_SEND);
+        intent.putExtra(Intent.EXTRA_STREAM, imageUri);
+        intent.setType("image/png");
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        startActivity(Intent.createChooser(intent, "分享到"));
     }
 }

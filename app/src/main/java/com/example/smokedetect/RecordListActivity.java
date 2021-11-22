@@ -3,8 +3,6 @@ package com.example.smokedetect;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.room.Room;
 
-import android.content.Context;
-import android.content.Intent;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -17,17 +15,18 @@ import java.util.List;
 
 public class RecordListActivity extends AppCompatActivity {
 
-    AppDatabase db;
+    AppDatabase db; // TODO: 处理数据库重复建立的问题，改为单例模式
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_record_list);
         db = Room.databaseBuilder(getApplicationContext(), AppDatabase.class, "db_smokedetect").allowMainThreadQueries().build();
-        fn();
+        generateRecordList();
     }
 
-    void fn() {
+    // 生成历史记录view
+    void generateRecordList() {
         List<DetectRecord> detectRecordList = db.detectRecordDao().getAll();
         LayoutInflater vi = getLayoutInflater();
         ViewGroup insertPoint = (ViewGroup) findViewById(R.id.insert_point);
@@ -45,4 +44,7 @@ public class RecordListActivity extends AppCompatActivity {
         }
     }
 
+    // TODO: 删除记录
+
+    // TODO: 点开记录到结果页
 }
